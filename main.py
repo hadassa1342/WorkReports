@@ -2,7 +2,7 @@ from parser import ReportParserFactory
 from generator import ReportHtmlPdfGenerator
 
 def main():
-    input_pdf_path = r"E:\מסלול יד\פרקטיקוד\data\inputs\a.pdf"
+    input_pdf_path = r"E:\מסלול יד\פרקטיקוד\data\inputs\b.pdf"
     output_csv_path = r"data/outputs/output_report.csv"
     output_pdf_path = r"data/outputs/output_report.pdf"
 
