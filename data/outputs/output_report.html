@@ -1,0 +1,396 @@
+﻿
+        <!DOCTYPE html>
+        <html lang="he" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <title>דוח שעות עבודה</title>
+            <style>
+                body {
+                    font-family: 'David', 'Arial', sans-serif;
+                    direction: rtl;
+                    color: #111827;
+                    margin: 40px;
+                    background-color: #ffffff;
+                }
+                .header-container {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 10px;
+                }
+                .report-title {
+                    font-size: 28px;
+                    font-weight: bold;
+                    color: #111827;
+                    margin: 0;
+                    text-align: right;
+                }
+                .report-month {
+                    font-size: 18px;
+                    color: #374151;
+                    margin-top: 5px;
+                    text-align: right;
+                }
+                .company-name {
+                    font-size: 14px;
+                    color: #4b5563;
+                    margin-top: 5px;
+                    text-align: right;
+                }
+                .header-right {
+                    text-align: right;
+                    width: 100%;
+                }
+                .divider {
+                    border: none;
+                    border-top: 1px solid #d1d5db;
+                    margin: 15px 0 25px 0;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 10px;
+                }
+                th, td {
+                    border: 1px solid #e5e7eb;
+                    padding: 8px 10px;
+                    text-align: center;
+                    font-size: 13px;
+                }
+                th {
+                    background-color: #16325c;
+                    color: #ffffff;
+                    font-weight: bold;
+                }
+                tr:nth-child(even) {
+                    background-color: #f9fafb;
+                }
+                .footer-row {
+                    background-color: #e2e8f0;
+                    font-weight: bold;
+                }
+                .summary-section {
+                    margin-top: 40px;
+                    width: 320px;
+                    float: left;
+                    border: 1px solid #e5e7eb;
+                    padding: 15px;
+                    background-color: #ffffff;
+                }
+                .summary-title {
+                    font-size: 16px;
+                    font-weight: bold;
+                    color: #111827;
+                    margin-bottom: 10px;
+                    border-bottom: 1px solid #e5e7eb;
+                    padding-bottom: 5px;
+                    text-align: right;
+                }
+                .summary-row {
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 4px 0;
+                    font-size: 14px;
+                }
+                .summary-label {
+                    color: #4b5563;
+                }
+                .summary-value {
+                    font-weight: bold;
+                    color: #111827;
+                }
+                .clearfix::after {
+                    content: "";
+                    clear: both;
+                    display: table;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header-container">
+                <div class="header-right">
+                    <div class="report-title">דו&quot;ח שעות עבודה (סוג A)</div>
+                    <div class="report-month">פברואר 2023</div>
+                    <div class="company-name">ג.ע. הכשר כח אדם בע"מ</div>
+                </div>
+            </div>
+
+            <hr class="divider">
+
+            <table>
+                <thead>
+                    
+                <tr>
+                    <th>תאריך</th>
+                    <th>יום</th>
+                    <th>מקום</th>
+                    <th>כניסה</th>
+                    <th>יציאה</th>
+                    <th>הפסקה</th>
+                    <th>סה&quot;כ</th>
+                    <th>100%</th>
+                    <th>125%</th>
+                    <th>150%</th>
+                    <th>שבת</th>
+                </tr>
+            
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>01/02/2023</td>
+                        <td>יום רביעי</td>
+                        <td>גונן</td>
+                        <td>07:34</td>
+                        <td>16:55</td>
+                        <td>00:30</td>
+                        <td>8.85</td>
+                        <td>8.00</td>
+                        <td>0.85</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>02/02/2023</td>
+                        <td>יום חמישי</td>
+                        <td>גונן</td>
+                        <td>07:16</td>
+                        <td>13:56</td>
+                        <td>00:30</td>
+                        <td>6.17</td>
+                        <td>6.17</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>05/02/2023</td>
+                        <td>יום ראשון</td>
+                        <td>גונן</td>
+                        <td>08:55</td>
+                        <td>17:26</td>
+                        <td>00:30</td>
+                        <td>8.02</td>
+                        <td>8.00</td>
+                        <td>0.02</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>07/02/2023</td>
+                        <td>יום שלישי</td>
+                        <td>גונן</td>
+                        <td>07:53</td>
+                        <td>13:11</td>
+                        <td>00:30</td>
+                        <td>4.80</td>
+                        <td>4.80</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>12/02/2023</td>
+                        <td>יום ראשון</td>
+                        <td>גונן</td>
+                        <td>09:04</td>
+                        <td>13:48</td>
+                        <td>00:30</td>
+                        <td>4.23</td>
+                        <td>4.23</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>13/02/2023</td>
+                        <td>יום שני</td>
+                        <td>גונן</td>
+                        <td>08:39</td>
+                        <td>16:50</td>
+                        <td>00:30</td>
+                        <td>7.68</td>
+                        <td>7.68</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>14/02/2023</td>
+                        <td>יום שלישי</td>
+                        <td>גונן</td>
+                        <td>09:35</td>
+                        <td>14:06</td>
+                        <td>00:30</td>
+                        <td>4.02</td>
+                        <td>4.02</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>15/02/2023</td>
+                        <td>יום רביעי</td>
+                        <td>גונן</td>
+                        <td>09:58</td>
+                        <td>18:16</td>
+                        <td>00:30</td>
+                        <td>7.80</td>
+                        <td>7.80</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>16/02/2023</td>
+                        <td>יום חמישי</td>
+                        <td>גונן</td>
+                        <td>08:08</td>
+                        <td>14:35</td>
+                        <td>00:30</td>
+                        <td>5.95</td>
+                        <td>5.95</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>19/02/2023</td>
+                        <td>יום ראשון</td>
+                        <td>גונן</td>
+                        <td>09:31</td>
+                        <td>14:53</td>
+                        <td>00:30</td>
+                        <td>4.87</td>
+                        <td>4.87</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>20/02/2023</td>
+                        <td>יום שני</td>
+                        <td>גונן</td>
+                        <td>08:21</td>
+                        <td>13:06</td>
+                        <td>00:30</td>
+                        <td>4.25</td>
+                        <td>4.25</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>22/02/2023</td>
+                        <td>יום רביעי</td>
+                        <td>גונן</td>
+                        <td>07:05</td>
+                        <td>11:48</td>
+                        <td>00:30</td>
+                        <td>4.22</td>
+                        <td>4.22</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>23/02/2023</td>
+                        <td>יום חמישי</td>
+                        <td>גונן</td>
+                        <td>09:46</td>
+                        <td>18:53</td>
+                        <td>00:30</td>
+                        <td>8.62</td>
+                        <td>8.00</td>
+                        <td>0.62</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>26/02/2023</td>
+                        <td>יום ראשון</td>
+                        <td>גונן</td>
+                        <td>07:02</td>
+                        <td>14:47</td>
+                        <td>00:30</td>
+                        <td>7.25</td>
+                        <td>7.25</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    <tr>
+                        <td>27/02/2023</td>
+                        <td>יום שני</td>
+                        <td>גונן</td>
+                        <td>08:48</td>
+                        <td>13:32</td>
+                        <td>00:30</td>
+                        <td>4.23</td>
+                        <td>4.23</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                        <td>0.00</td>
+                    </tr>
+                
+                    
+                <tr class="footer-row">
+                    <td>סה&quot;כ</td><td></td><td></td><td></td><td></td>
+                    <td>07:30</td>
+                    <td>90.96</td>
+                    <td>89.47</td>
+                    <td>1.49</td>
+                    <td>0.00</td>
+                    <td>0.00</td>
+                </tr>
+            
+                </tbody>
+            </table>
+
+            <div class="clearfix">
+                <div class="summary-section">
+                    <div class="summary-title">סיכום חודשי</div>
+                    <div class="summary-row">
+                        <span class="summary-label">ימי עבודה</span>
+                        <span class="summary-value">15</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">סה&quot;כ שעות</span>
+                        <span class="summary-value">90.96</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">שעות 100%</span>
+                        <span class="summary-value">89.47</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">שעות 125%</span>
+                        <span class="summary-value">1.49</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">שעות 150%</span>
+                        <span class="summary-value">0.00</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">שבת</span>
+                        <span class="summary-value">0.00</span>
+                    </div>
+                    
+                </div>
+            </div>
+        </body>
+        </html>
+        
