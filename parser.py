@@ -4,6 +4,7 @@ import csv
 from abc import ABC, abstractmethod
 from datetime import datetime
 import pdfplumber
+from ocr_words import page_words
 from domain.models import ReportARow, ReportBRow, ReportResult
 
 # weekday(): 0=שני ... 5=שבת, 6=ראשון
@@ -33,20 +34,44 @@ def date_sort_key(date_text):
     return parse_date(date_text) or datetime.max
 
 
+_BIDI_MARKS = dict.fromkeys(map(ord, "\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"))
+
+
+def clean_token(text):
+    """מסיר תווי כיווניות נסתרים (RLM וכו') שנדבקים לתאריכים ומספרים."""
+    return str(text).translate(_BIDI_MARKS).strip()
+
+
 def read_word_lines(page):
-    """מחזיר שורות מהעמוד, מלמעלה למטה. בכל שורה המילים (dict עם text ו-x0/x1) מימין לשמאל."""
-    words = page.extract_words()
+    """
+    מחזיר שורות מהעמוד, מלמעלה למטה. בכל שורה המילים (dict עם text, x0, x1, top, bottom)
+    מימין לשמאל. קיבוץ לפי מרכז אנכי: מילה שייכת לשורה אם היא קרובה אנכית למילה
+    הקודמת, כך שגם סריקה מעט עקומה לא מפצלת שורה.
+    """
+    words = []
+    for w in page_words(page):
+        text = clean_token(w["text"])
+        if not text or not any(c.isalnum() for c in text):    # קווי טבלה ('|') וכו'
+            continue
+        w = dict(w)
+        w["text"] = text
+        w["cy"] = (w["top"] + w.get("bottom", w["top"])) / 2
+        words.append(w)
     if not words:
         return []
-    lines = {}
-    for w in words:
-        line_y = round(w['top'] / 7) * 7
-        lines.setdefault(line_y, []).append(w)
-    result = []
-    for line_y in sorted(lines):
-        line_words = sorted(lines[line_y], key=lambda x: x['x0'], reverse=True)
-        result.append(line_words)
-    return result
+
+    heights = sorted(w.get("bottom", w["top"]) - w["top"] for w in words)
+    median_h = heights[len(heights) // 2] or 8
+    tol = 0.6 * median_h
+
+    words.sort(key=lambda w: w["cy"])
+    lines = [[words[0]]]
+    for w in words[1:]:
+        if w["cy"] - lines[-1][-1]["cy"] > tol:
+            lines.append([w])
+        else:
+            lines[-1].append(w)
+    return [sorted(line, key=lambda x: x["x0"], reverse=True) for line in lines]
 
 
 def read_lines(page):
@@ -80,92 +105,134 @@ class BaseParser(ABC):
             return 0.0
 
 
+def _has_hebrew(text):
+    return any('\u0590' <= c <= '\u05FF' for c in text)
+
+
+def _to_hours(token):
+    """'6.50' -> 6.5, '6,50' -> 6.5, '650' (נקודה שאבדה ב-OCR) -> 6.5. אחרת None."""
+    cleaned = re.sub(r"[^\d.,]", "", token)
+    if re.fullmatch(r"\d+[.,]\d{1,2}", cleaned):
+        return float(cleaned.replace(",", "."))
+    if re.fullmatch(r"\d{3}", cleaned):
+        return int(cleaned) / 100
+    return None
+
+
+def _split_hours_rule(total, weekday):
+    """גיבוי כשהחלוקה לא נקראה: שבת -> הכול לשבת. אחרת עד 8 ב-100%, שעתיים ב-125%, השאר 150%."""
+    if weekday == 5:
+        return 0.0, 0.0, 0.0, total
+    h125 = round(float(min(max(total - 8, 0), 2)), 2)
+    h150 = round(float(max(total - 10, 0)), 2)
+    return round(total - h125 - h150, 2), h125, h150, 0.0
+
+
 class TypeAParser(BaseParser):
+    """
+    סוג A. עמודות (מימין לשמאל):
+    תאריך | יום | מקום | כניסה | יציאה | הפסקה | סה"כ | 100% | 125% | 150% | שבת
+
+    כל שורה מזוהה לפי התאריך שבה. כניסה/יציאה/הפסקה נלקחות משלוש השעות בשורה
+    (לפי סדר, מימין לשמאל), והיום מחושב מהתאריך. הסה"כ מחושב מהשעות ולא נקרא
+    מה-OCR, שמפספס לפעמים נקודה עשרונית.
+    """
+
     def parse(self, pdf_path: str) -> ReportResult:
         rows = []
-        summary = {}
-
-        days_hebrew = {
-            0: "יום שני",
-            1: "יום שלישי",
-            2: "יום רביעי",
-            3: "יום חמישי",
-            4: "יום שישי",
-            5: "יום שבת",
-            6: "יום ראשון"
-        }
+        locations = []
 
         with pdfplumber.open(pdf_path) as pdf:
             for page in pdf.pages:
-                words = page.extract_words()
-                if not words:
-                    continue
-
-                lines_dict = {}
-                for w in words:
-                    line_y = round(w['top'] / 7) * 7
-                    if line_y not in lines_dict:
-                        lines_dict[line_y] = []
-                    lines_dict[line_y].append(w)
-
-                for line_y in sorted(lines_dict.keys()):
-                    line_words = sorted(lines_dict[line_y], key=lambda x: x['x0'], reverse=True)
-                    tokens = [w['text'] for w in line_words]
-
-                    if not tokens:
+                for line in read_word_lines(page):
+                    tokens = [w["text"] for w in line]
+                    date_tok = next((t for t in tokens if _DATE_RE.match(t)), None)
+                    if date_tok is None:
                         continue
-
-                    date_val = None
-                    date_idx = -1
-                    for idx, token in enumerate(tokens):
-                        if '/' in token and len(token) >= 8 and any(char.isdigit() for char in token):
-                            date_val = token
-                            date_idx = idx
-                            break
-
-                    if not date_val or date_idx == -1:
+                    parsed = self._parse_row(tokens, date_tok)
+                    if parsed is None:
                         continue
+                    row, location = parsed
+                    rows.append(row)
+                    if location:
+                        locations.append(location)
 
-                    try:
-                        try:
-                            dt_obj = datetime.strptime(date_val.strip(), "%d/%m/%Y")
-                            day = days_hebrew.get(dt_obj.weekday(), "")
-                        except Exception:
-                            day = "יום כלשהו"
+        # המקום זהה בדרך כלל בכל השורות, ולכן לוקחים את הנפוץ ביותר (מסנן רעש של OCR)
+        common_location = "משרד ראשי"
+        if locations:
+            common_location = max(set(locations), key=locations.count)
+        for row in rows:
+            row.location = common_location
 
-                        location = "משרד ראשי"
-
-                        entry_time = tokens[date_idx + 2] if date_idx + 2 < len(tokens) and ":" in tokens[
-                            date_idx + 2] else "08:00"
-                        exit_time = tokens[date_idx + 3] if date_idx + 3 < len(tokens) and ":" in tokens[
-                            date_idx + 3] else "16:00"
-                        break_time = tokens[date_idx + 4] if date_idx + 4 < len(tokens) else "00:30"
-
-                        total_hours = self.safe_float(tokens[date_idx + 5]) if date_idx + 5 < len(tokens) and tokens[
-                            date_idx + 5].replace('.', '', 1).isdigit() else 7.5
-                        hours_100 = total_hours
-                        hours_125 = 0.0
-                        hours_150 = 0.0
-                        shabbat_hours = 0.0
-
-                        row_obj = ReportARow(
-                            date=date_val,
-                            day=day,
-                            location=location,
-                            entry_time=entry_time,
-                            exit_time=exit_time,
-                            break_time=break_time,
-                            total_hours=total_hours,
-                            hours_100=hours_100,
-                            hours_125=hours_125,
-                            hours_150=hours_150,
-                            shabbat_hours=shabbat_hours
-                        )
-                        rows.append(row_obj)
-                    except Exception:
-                        continue
+        summary = {}
+        months = [(parse_date(r.date).year, parse_date(r.date).month) for r in rows if parse_date(r.date)]
+        if months:
+            year, month = max(set(months), key=months.count)
+            summary["month_year"] = f"{MONTH_NAMES[month - 1]} {year}"
 
         return ReportResult(report_type="A", rows=rows, summary_data=summary)
+
+    def _parse_row(self, tokens, date_tok):
+        dt = parse_date(date_tok)
+        if dt is None:
+            return None
+        weekday = dt.weekday()
+        day = f"יום {DAY_NAMES[weekday]}"
+
+        visual = any(t in _REVERSED_DAYS for t in tokens)
+
+        times = [t for t in tokens if _TIME_RE.match(t)]
+        entry_time = exit_time = break_time = ""
+        total = 0.0
+        if len(times) >= 2:
+            e, x = times[0], times[1]
+            b = times[2] if len(times) >= 3 else "00:30"
+            e_m, x_m, b_m = (self._minutes(v) for v in (e, x, b))
+            total = round((x_m - e_m - b_m) / 60, 2)
+            if total > 0:
+                entry_time, exit_time, break_time = e, x, b
+            else:
+                total = 0.0    # שעות לא הגיוניות (שגיאת OCR): נשארות ריקות, ה-generator יגריל
+
+        # חלוקה ל-100/125/150/שבת: אם נקראו 5 ערכים שמסתדרים עם הסה"כ - משתמשים בהם
+        values = []
+        for t in tokens:
+            if t == date_tok or _TIME_RE.match(t) or "/" in t or _has_hebrew(t):
+                continue
+            v = _to_hours(t)
+            if v is not None:
+                values.append(v)
+        split = None
+        if total > 0 and len(values) == 5:
+            if abs(values[0] - total) < 0.011 and abs(sum(values[1:]) - total) < 0.011:
+                split = tuple(values[1:])
+        if split is None:
+            split = _split_hours_rule(total, weekday)
+        h100, h125, h150, shabbat = split
+
+        words = [t[::-1] if visual else t for t in tokens if _has_hebrew(t)]
+        words = [w for w in words if w != "יום" and w not in DAY_NAMES]
+        location = " ".join(words).strip()
+
+        row = ReportARow(
+            date=date_tok,
+            day=day,
+            location="",
+            entry_time=entry_time,
+            exit_time=exit_time,
+            break_time=break_time,
+            total_hours=total,
+            hours_100=h100,
+            hours_125=h125,
+            hours_150=h150,
+            shabbat_hours=shabbat,
+        )
+        return row, location
+
+    @staticmethod
+    def _minutes(hhmm):
+        h, m = hhmm.split(":")
+        return int(h) * 60 + int(m)
 
 
 class TypeBParser(BaseParser):
@@ -270,16 +337,16 @@ class TypeBParser(BaseParser):
             if w in DAY_NAMES:
                 del words[i]
                 break
+        # הערות הן טקסט עברי בלבד; זבל של OCR (אותיות לועזיות/סימנים) נזרק
+        words = [w for w in words if any('\u0590' <= c <= '\u05FF' for c in w)]
         notes = " ".join(words).strip()
 
         if len(times) >= 2:
             entry_time, exit_time = times[0], times[1]
-            if total_tok is not None:
-                total_hours = float(total_tok)
-            else:
-                h1, m1 = map(int, entry_time.split(":"))
-                h2, m2 = map(int, exit_time.split(":"))
-                total_hours = round(((h2 * 60 + m2) - (h1 * 60 + m1)) / 60, 2)
+            # הסה"כ תמיד מחושב מהשעות (ולא נלקח מהטקסט), כדי ש-OCR שטעה בספרה לא ישפיע
+            h1, m1 = map(int, entry_time.split(":"))
+            h2, m2 = map(int, exit_time.split(":"))
+            total_hours = round(((h2 * 60 + m2) - (h1 * 60 + m1)) / 60, 2)
         else:
             # שבת/חג: בלי שעות
             entry_time, exit_time, total_hours = "", "", 0.0
@@ -297,17 +364,23 @@ class TypeBParser(BaseParser):
 class ReportParserFactory:
     @staticmethod
     def detect_report_type(pdf_path: str) -> str:
+        """זיהוי לפי כותרות העמודות (גם בקובץ סרוק, דרך OCR). שם הקובץ רק כגיבוי."""
+        text = ""
+        with pdfplumber.open(pdf_path) as pdf:
+            if pdf.pages:
+                text = " ".join(w["text"] for w in page_words(pdf.pages[0]))
+
+        def has(*keys):
+            return any(k in text or k[::-1] in text for k in keys)
+
+        if has("הפסקה", "מקום"):          # עמודות שקיימות רק בסוג A
+            return 'A'
+        if has("הערות", "שעת", "חודשיות"):  # כותרות שקיימות רק בסוג B
+            return 'B'
+
         filename = os.path.basename(pdf_path).lower()
         if 'b' in filename:
             return 'B'
-        if 'a' in filename:
-            return 'A'
-
-        with pdfplumber.open(pdf_path) as pdf:
-            for page in pdf.pages:
-                text = page.extract_text() or ""
-                if "נוכחות" in text or "כרטסת" in text or "הערות" in text:
-                    return 'B'
         return 'A'
 
     @staticmethod
