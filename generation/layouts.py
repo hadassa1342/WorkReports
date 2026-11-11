@@ -24,19 +24,19 @@ class SummaryItem:
 
 @dataclass(frozen=True)
 class ReportLayout:
-    title: str
+    title: str                      # ריק = בלי כותרת (כמו במקור)
     columns: tuple[Column, ...]
     summary_items: tuple[SummaryItem, ...]
     summary_on_top: bool            # A: כרטיסים מעל הטבלה. B: טבלת סיכום מתחת
     totals_row: bool                # B: שורת סכומים בתחתית הטבלה
     time_format: str                # "h:mm" (8:30) או "hh:mm" (08:30), כמו במקור
-    header_fields: tuple[str, ...]  # שדות של ReportSummary שמוצגים מתחת לכותרת
+    header_fields: tuple[tuple[str, str], ...]  # (תווית, שדה של ReportSummary) שמוצגים בראש הדו"ח
     employee_line: bool
 
 
 LAYOUTS: dict[ReportType, ReportLayout] = {
     ReportType.TYPE_A: ReportLayout(
-        title="דוח שעות עבודה",
+        title="",
         columns=(
             Column("תאריך", "work_date", "date"),
             Column("יום בשבוע", "day_name"),
@@ -46,23 +46,23 @@ LAYOUTS: dict[ReportType, ReportLayout] = {
             Column("הערות", "note"),
         ),
         summary_items=(
-            SummaryItem("לתשלום", "total_pay", "money"),
+            SummaryItem('סה"כ ימי עבודה לחודש', "total_days", "int"),
+            SummaryItem('סה"כ שעות חודשיות', "total_hours", "hours"),
             SummaryItem("מחיר לשעה", "hourly_rate", "money"),
-            SummaryItem("שעות חודשיות", "total_hours", "hours"),
-            SummaryItem("ימי עבודה", "total_days", "int"),
+            SummaryItem('סה"כ לתשלום', "total_pay", "money"),
         ),
         summary_on_top=True,
         totals_row=False,
         time_format="h:mm",
-        header_fields=("month_label",),
+        header_fields=(("כרטיס עובד לחודש:", "month_label"),),
         employee_line=True,
     ),
     ReportType.TYPE_B: ReportLayout(
-        title='דו"ח שעות עבודה',
+        title="",
         columns=(
             Column("תאריך", "work_date", "date"),
             Column("יום", "day_name"),
-            Column("מקום", "location"),
+            Column("מקום עבודה", "location"),
             Column("כניסה", "entry_time", "time"),
             Column("יציאה", "exit_time", "time"),
             Column("הפסקה", "break_minutes", "minutes", "total_break_minutes"),
@@ -73,19 +73,19 @@ LAYOUTS: dict[ReportType, ReportLayout] = {
             Column("שבת", "shabbat_hours", "hours", "shabbat_hours"),
         ),
         summary_items=(
-            SummaryItem("ימי עבודה", "total_days", "int"),
+            SummaryItem("ימים", "total_days", "int"),
             SummaryItem('סה"כ שעות', "total_hours"),
             SummaryItem("שעות 100%", "hours_100"),
             SummaryItem("שעות 125%", "hours_125"),
             SummaryItem("שעות 150%", "hours_150"),
-            SummaryItem("שבת", "shabbat_hours"),
+            SummaryItem("שבת 150%", "shabbat_hours"),
             SummaryItem("מחיר לשעה", "hourly_rate", "money"),
             SummaryItem('סה"כ לתשלום', "total_pay", "money"),
         ),
         summary_on_top=False,
         totals_row=True,
         time_format="hh:mm",
-        header_fields=("month_label", "company_name"),
+        header_fields=(("", "company_name"), ("", "month_label")),
         employee_line=False,
     ),
 }

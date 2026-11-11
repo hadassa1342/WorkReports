@@ -8,7 +8,8 @@ from dataclasses import replace
 from config.rules import TransformRules
 from domain.models import AttendanceReport, ReportType
 from transformation.base_strategy import BaseTransformationStrategy
-from transformation.validation import validate_row, validate_summary
+from transformation.validation import (validate_no_shabbat_work, validate_row, validate_same_dates,
+                                       validate_summary)
 
 
 class TransformationService:
@@ -29,9 +30,13 @@ class TransformationService:
         for row in report.rows:
             rng = random.Random(seed * 1_000_000 + row.work_date.toordinal())
             new_row = strategy.transform_row(row, rules, rng)
+            if new_row is None:                                   # שורה שלא מופיעה בווריאציה
+                continue
             validate_row(new_row, rules)
             new_rows.append(new_row)
         new_report = replace(report, rows=tuple(new_rows),
                              summary=strategy.build_summary(new_rows, report.summary))
         validate_summary(new_report)
+        validate_same_dates(report, new_report)
+        validate_no_shabbat_work(new_report, rules)
         return new_report

@@ -96,13 +96,45 @@ def test_summary_is_recomputed_after_the_change():
     assert new.summary.total_pay == round(new.summary.total_hours * 40.0, 2)
 
 
-def test_type_b_shabbat_hours_go_to_the_shabbat_column():
-    row = AttendanceRow(date(2023, 2, 4), "יום שבת", time(8, 0), time(14, 0), 5.5,
-                        location="גונן", break_minutes=30, hours_100=0, hours_125=0, hours_150=0, shabbat_hours=5.5)
-    report = AttendanceReport(ReportType.TYPE_B, (row,), ReportSummary(1, 5.5))
-    new = SERVICE.transform(report).rows[0]
+def _shabbat_row_b():
+    return AttendanceRow(date(2023, 2, 4), "יום שבת", time(8, 0), time(14, 0), 5.5, location="גונן",
+                         break_minutes=30, hours_100=0, hours_125=0, hours_150=0, shabbat_hours=5.5)
+
+
+def test_type_b_no_work_on_shabbat_row_is_removed():
+    """בסוג B מופיעים רק ימי עבודה, ולכן שבת שבה לא עובדים לא מופיעה, והסיכום מחושב בלעדיה."""
+    sunday = AttendanceRow(date(2023, 2, 5), "יום ראשון", time(8, 0), time(16, 0), 7.5, location="גונן",
+                           break_minutes=30, hours_100=7.5, hours_125=0, hours_150=0, shabbat_hours=0)
+    report = AttendanceReport(ReportType.TYPE_B, (_shabbat_row_b(), sunday), ReportSummary(2, 13.0))
+    new = SERVICE.transform(report)
+    assert [r.work_date for r in new.rows] == [date(2023, 2, 5)]
+    assert new.summary.total_days == 1 and new.summary.shabbat_hours == 0
+
+
+def test_type_a_no_work_on_shabbat_row_stays_empty():
+    """בסוג A יש שורה לכל יום, ולכן שורת השבת נשארת - בלי שעות."""
+    row = AttendanceRow(date(2022, 9, 3), "שבת", time(8, 30), time(12, 0), 3.5)
+    report = AttendanceReport(ReportType.TYPE_A, (row,), ReportSummary(1, 3.5, hourly_rate=30.0))
+    new = SERVICE.transform(report)
+    assert len(new.rows) == 1 and not new.rows[0].is_work_day
+    assert (new.summary.total_days, new.summary.total_hours, new.summary.total_pay) == (0, 0, 0)
+
+
+def test_shabbat_hours_go_to_the_shabbat_column_when_allowed():
+    """אם משנים את הכלל ל-work_on_shabbat=True, השעות של שבת נכנסות לעמודת שבת."""
+    rules = {t: replace(r, work_on_shabbat=True) for t, r in RULES.items()}
+    service = TransformationService(SERVICE._strategies, rules)
+    report = AttendanceReport(ReportType.TYPE_B, (_shabbat_row_b(),), ReportSummary(1, 5.5))
+    new = service.transform(report).rows[0]
     assert (new.hours_100, new.hours_125, new.hours_150) == (0.0, 0.0, 0.0)
     assert new.shabbat_hours == new.total_hours
+
+
+@real_fixtures
+def test_real_sample_has_no_work_on_shabbat(fixture_path):
+    pages = load_fixture(fixture_path)
+    new = SERVICE.transform(get_parser(classify(pages_to_text(pages))).parse(pages))
+    assert not [r for r in new.rows if r.is_work_day and r.work_date.weekday() == 5]
 
 
 # ---------- מקרי קצה ----------

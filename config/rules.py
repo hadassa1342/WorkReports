@@ -20,6 +20,7 @@ class TransformRules:
     min_daily_hours: float = 1.0
     max_daily_hours: float = 12.0
     avoid_round_minutes: int = 15       # לא לייצר שעות "עגולות מדי" (08:00, 08:15...). 0 = לא לבדוק
+    work_on_shabbat: bool = False       # False: בווריאציה העובד לא עובד בשבת, גם אם במקור עבד
     max_attempts: int = 1000
 
 
@@ -38,4 +39,3 @@ OVERTIME_125_UNTIL = 10.0
 # פרסור
 MAX_BREAK_MINUTES = 180         # שעה קצרה מזה בשורה של סוג B היא הפסקה, לא כניסה/יציאה
 DEFAULT_BREAK_MINUTES = 30      # רק כשההפסקה לא נקראה מה-OCR. נרשמת אזהרה
-MAX_MISSING_DAYS_TO_FILL = 3    # סוג A: פער של עד 3 ימים בין תאריכים מושלם בשורות ריקות (שבת/חג)

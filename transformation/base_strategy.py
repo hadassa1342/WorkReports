@@ -10,16 +10,24 @@ from datetime import time
 from config.rules import TransformRules
 from domain.exceptions import TransformationError
 from domain.models import AttendanceRow, ReportSummary
-from domain.time_math import from_minutes, to_minutes
+from domain.time_math import SATURDAY, from_minutes, to_minutes
 from transformation.validation import is_acceptable_shift
 
 
 class BaseTransformationStrategy(ABC):
     @abstractmethod
-    def transform_row(self, row: AttendanceRow, rules: TransformRules, rng: random.Random) -> AttendanceRow: ...
+    def transform_row(self, row: AttendanceRow, rules: TransformRules,
+                      rng: random.Random) -> AttendanceRow | None:
+        """מחזיר שורה חדשה, או None אם השורה לא מופיעה בווריאציה (שבת בסוג B)."""
 
     @abstractmethod
     def build_summary(self, rows: list[AttendanceRow], original: ReportSummary) -> ReportSummary: ...
+
+    # ---------- שבת, משותף ----------
+    @staticmethod
+    def _works_on_shabbat(row: AttendanceRow, rules: TransformRules) -> bool:
+        """יום עבודה בשבת, כשהכללים לא מתירים עבודה בשבת."""
+        return row.is_work_day and row.work_date.weekday() == SATURDAY and not rules.work_on_shabbat
 
     # ---------- הגרלת משמרת, משותף ----------
     @staticmethod

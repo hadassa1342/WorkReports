@@ -13,8 +13,8 @@ from domain.models import AttendanceRow, ReportSummary, ReportType
 from domain.time_math import SATURDAY, hours_between, split_overtime, to_minutes
 from domain.totals import sum_field, work_rows
 from parsing.base_parser import BaseParser
-from parsing.text_tools import (DAY_NAMES, TIME_RE, has_hebrew, hebrew_words, is_visual_order,
-                                logical, month_label, read_times, to_hours)
+from parsing.text_tools import (DAY_NAMES, column_values, has_hebrew, hebrew_words, is_visual_order,
+                                logical, month_label, read_times)
 
 log = logging.getLogger(__name__)
 _SPLIT_TOLERANCE = 0.011
@@ -50,7 +50,7 @@ class TypeBParser(BaseParser):
             log.warning("%s: exit is not after entry (%s-%s) - row kept without hours", work_date, entry, exit_)
             return AttendanceRow(work_date, day_name, None, None, 0.0, location=location)
 
-        h100, h125, h150, shabbat = self._read_split(tokens, total) or split_overtime(
+        h100, h125, h150, shabbat = self._read_split(line, total) or split_overtime(
             total, work_date.weekday() == SATURDAY, REGULAR_HOURS, OVERTIME_125_UNTIL)
         return AttendanceRow(
             work_date=work_date, day_name=day_name, entry_time=entry, exit_time=exit_,
@@ -62,18 +62,20 @@ class TypeBParser(BaseParser):
         return f"יום {DAY_NAMES[d.weekday()]}"
 
     @staticmethod
-    def _read_split(tokens, total):
-        """אם נקראו 5 מספרים (סה"כ, 100, 125, 150, שבת) שמסתדרים עם הסה"כ המחושב - משתמשים בהם."""
-        values = [to_hours(t) for t in tokens
-                  if not TIME_RE.match(t) and "/" not in t and not has_hebrew(t)]
-        values = [v for v in values if v is not None]
+    def _read_split(line, total):
+        """
+        עמודות המספרים מימין לשמאל: סה"כ, 100%, 125%, 150%, שבת. בכל עמודה - הערך שנקרא הכי הרבה פעמים.
+        משתמשים בהן אם הן מסתדרות עם הסה"כ המחושב. כך נשמר יום מיוחד כמו במקור
+        (17/10/2022: כל 6.50 השעות ב-150%, למרות שלפי הכלל הרגיל זה היה 100%).
+        """
+        values = column_values(line)
         if len(values) == 5 and abs(values[0] - total) < _SPLIT_TOLERANCE \
                 and abs(sum(values[1:]) - total) < _SPLIT_TOLERANCE:
             return tuple(values[1:])
         return None
 
     # ---------- מקום: אותו מקום בכל השורות ----------
-    def _finish_rows(self, rows):
+    def _finish_rows(self, rows, header_lines):
         """המקום זהה בדרך כלל בכל השורות, ולכן לוקחים את הנפוץ ביותר (מסנן רעש של OCR)."""
         locations = Counter(r.location for r in rows if r.location)
         if not locations:

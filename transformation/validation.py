@@ -6,7 +6,7 @@ validate_row / validate_summary - בדיקה אחרי ההגרלה: אם משה�
 from config.rules import TransformRules
 from domain.exceptions import TransformationError
 from domain.models import AttendanceReport, AttendanceRow
-from domain.time_math import hours_between, to_minutes
+from domain.time_math import SATURDAY, hours_between, to_minutes
 from domain.totals import sum_field, work_rows
 
 _TOLERANCE = 0.011    # עיגול לשתי ספרות
@@ -55,6 +55,24 @@ def validate_summary(report: AttendanceReport) -> None:
     if s.hourly_rate is not None and s.total_pay is not None \
             and abs(s.total_pay - round(s.total_hours * s.hourly_rate, 2)) > _TOLERANCE:
         raise TransformationError("total pay != total hours * hourly rate")
-    months = {(r.work_date.year, r.work_date.month) for r in report.rows}
-    if len(months) > 1:
-        raise TransformationError(f"rows belong to more than one month: {sorted(months)}")
+
+
+def validate_same_dates(original: AttendanceReport, new: AttendanceReport) -> None:
+    """
+    התאריכים והימים לא משתנים ואין שורות חדשות, וכך גם החודש נשאר אותו חודש.
+    שורה יכולה לרדת רק אם היא שבת (סוג B, כשאין עבודה בשבת).
+    """
+    original_days = [(r.work_date, r.day_name) for r in original.rows]
+    new_days = [(r.work_date, r.day_name) for r in new.rows]
+    removed = [d for d, _ in original_days if (d, _) not in new_days]
+    kept = [day for day in original_days if day in new_days]
+    if kept != new_days or any(d.weekday() != SATURDAY for d in removed):
+        raise TransformationError("dates or days changed in the transformation")
+
+
+def validate_no_shabbat_work(report: AttendanceReport, rules: TransformRules) -> None:
+    if rules.work_on_shabbat:
+        return
+    busy = [r.work_date for r in report.rows if r.is_work_day and r.work_date.weekday() == SATURDAY]
+    if busy:
+        raise TransformationError(f"work on Shabbat in the variation: {busy}")

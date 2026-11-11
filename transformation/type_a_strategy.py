@@ -10,7 +10,11 @@ from transformation.base_strategy import BaseTransformationStrategy
 
 
 class TypeATransformationStrategy(BaseTransformationStrategy):
-    def transform_row(self, row: AttendanceRow, rules: TransformRules, rng: random.Random) -> AttendanceRow:
+    def transform_row(self, row: AttendanceRow, rules: TransformRules,
+                      rng: random.Random) -> AttendanceRow | None:
+        if self._works_on_shabbat(row, rules):
+            # השורה נשארת בטבלה (בסוג A יש שורה לכל יום), בלי שעות - כמו שאר השבתות
+            return replace(row, entry_time=None, exit_time=None, total_hours=0.0)
         if not row.is_work_day:
             return row                                   # שבת / חג: לא ממציאים שעות
         entry, exit_ = self._pick_shift(row, rules, rng)

@@ -100,16 +100,31 @@ def test_factory_returns_the_right_parser():
     assert isinstance(get_parser(ReportType.TYPE_B), TypeBParser)
 
 
-# ---------- על פלט OCR אמיתי ----------
+# ---------- על פלט OCR אמיתי: המספרים כמו שהם מודפסים בקבצי הדוגמה ----------
+EXPECTED = {
+    # קובץ: (סוג, ימי עבודה, סה"כ שעות, מחיר לשעה, לתשלום, 100%, 150%, שבת)
+    "n_r_5_n.json": (ReportType.TYPE_A, 24, 84.00, 30.65, 2574.60, None, None, None),
+    "n_r_10_n.json": (ReportType.TYPE_A, 21, 63.02, 32.35, 2038.59, None, None, None),
+    "a_r_9.json": (ReportType.TYPE_B, 22, 143.00, None, None, 117.0, 6.5, 19.5),
+    "a_r_25.json": (ReportType.TYPE_B, 15, 110.50, None, None, 110.5, 0.0, 0.0),
+}
+
+
 @real_fixtures
-def test_real_sample_is_parsed(fixture_path):
+def test_real_sample_matches_the_printed_totals(fixture_path):
+    if fixture_path.name not in EXPECTED:
+        pytest.skip("no expected values for this file")
+    report_type, days, hours, rate, pay, h100, h150, shabbat = EXPECTED[fixture_path.name]
     pages = load_fixture(fixture_path)
     report = get_parser(classify(pages_to_text(pages))).parse(pages)
-    months = {(r.work_date.year, r.work_date.month) for r in report.rows}
-    assert len(report.rows) >= 20, "a monthly report should have at least 20 rows"
-    assert len(months) == 1
-    weekdays = [r for r in report.rows if r.work_date.weekday() not in (4, 5)]
-    assert sum(r.is_work_day for r in weekdays) >= 0.7 * len(weekdays), "most weekdays should have hours"
+    s = report.summary
+    assert report.report_type == report_type
+    assert s.total_days == days
+    assert abs(s.total_hours - hours) <= 0.02          # הכותרת מעגלת מדקות, השורות מעוגלות כל אחת
+    assert (s.hourly_rate, s.total_pay) == (rate, pay)
+    if h100 is not None:
+        assert (s.hours_100, s.hours_150, s.shabbat_hours) == (h100, h150, shabbat)
+    assert len({(r.work_date.year, r.work_date.month) for r in report.rows if r.work_date.day > 1}) == 1
 
 
 # ---------- שגיאות OCR אמיתיות שתוקנו ----------
@@ -131,3 +146,32 @@ def test_misread_date_on_the_same_line_does_not_steal_the_row():
     rows = TypeAParser().parse([page]).rows
     assert rows[1].work_date == date(2022, 9, 2) and not rows[1].is_work_day
     assert rows[-1].work_date == date(2022, 9, 8) and rows[-1].is_work_day
+
+
+@pytest.mark.parametrize("name", ["n_r_5_n.json", "n_r_10_n.json"])
+@pytest.mark.parametrize("shift", [1, -1])
+def test_dates_misread_by_one_day_do_not_move_hours_to_shabbat(name, shift):
+    """
+    ב-OCR של מחשב אחר כל התאריכים יכולים להיקרא יום אחד הצידה. בלי בדיקה, השעות של יום שישי
+    היו נרשמות על שבת. התוצאה חייבת להיות זהה לקריאה הנכונה.
+    """
+    import copy
+    from datetime import timedelta
+    from parsing.text_tools import DATE_RE, clean_token, parse_date
+    from tests.conftest import FIXTURES_DIR
+
+    path = FIXTURES_DIR / name
+    if not path.exists():
+        pytest.skip("fixture not saved yet")
+    pages = load_fixture(path)
+    shifted = copy.deepcopy(pages)
+    for word in shifted[0]:
+        text = clean_token(word["text"])
+        if DATE_RE.match(text) and parse_date(text):
+            d = parse_date(text) + timedelta(days=shift)
+            word["text"] = f"{d.day}/{d.month}/{d.year % 100}"
+
+    expected = TypeAParser().parse(pages).rows
+    rows = TypeAParser().parse(shifted).rows
+    assert rows == expected
+    assert not [r for r in rows if r.work_date.weekday() == 5 and r.is_work_day]

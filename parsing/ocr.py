@@ -25,6 +25,11 @@ HEBREW_PSM = 6              # בלוק אחיד של שורות - מתאים ל�
 NUMERIC_PASSES = [(300, 6), (200, 12), (300, 3), (400, 6), (400, 4), (200, 6), (250, 6), (500, 6)]
 TOP_CROP_RATIO = 0.30       # קופסת הסיכום בראש הדף קטנה, ומעבר על כל העמוד מפספס אותה
 TOP_CROP_PSMS = (6, 4, 11)
+# קופסת הסיכום בדו"ח הפשוט: Tesseract מתבלבל כשהתוויות העבריות צמודות למספרים, ולא קורא אותם.
+# מעבר על "חלונות" צרים של ראש הדף קורא אותם ('63.02', '32.35' שלא נקראו במעבר על כל הרוחב).
+HEADER_WINDOW_DPI = 400
+HEADER_WINDOW_ROWS = (0.08, 0.32)                     # החלק האנכי של הדף
+HEADER_WINDOWS = [(x, x + 0.14) for x in (0.24, 0.30, 0.36, 0.42, 0.48, 0.54)]
 _WORD_KEYS = ("x0", "x1", "top", "bottom")
 
 
@@ -125,6 +130,20 @@ def _ocr_page(page) -> list[dict]:
     for psm in TOP_CROP_PSMS:
         numeric += [w for w in _ocr_pass(pytesseract, top_crop, "eng", 72 / 300, psm)
                     if any(c.isdigit() for c in w["text"])]
+
+    big = image_at(HEADER_WINDOW_DPI)
+    top, bottom = (int(big.height * r) for r in HEADER_WINDOW_ROWS)
+    for x0, x1 in HEADER_WINDOWS:
+        left = int(big.width * x0)
+        window = big.crop((left, top, int(big.width * x1), bottom))
+        scale = 72 / HEADER_WINDOW_DPI
+        for w in _ocr_pass(pytesseract, window, "eng", scale, 6):
+            if any(c.isdigit() for c in w["text"]):
+                for key in ("x0", "x1"):
+                    w[key] += left * scale
+                for key in ("top", "bottom"):
+                    w[key] += top * scale
+                numeric.append(w)
 
     hebrew = [w for w in _ocr_pass(pytesseract, image_at(HEBREW_DPI), "heb+eng", 72 / HEBREW_DPI, HEBREW_PSM)
               if _has_hebrew(w["text"])]

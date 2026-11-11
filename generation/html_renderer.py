@@ -186,20 +186,21 @@ class HtmlRenderer(BaseRenderer):
                                 f'<span class="summary-value">{_e(v)}</span></div>' for k, v in items)
                             + "</div></div>")
 
-        header_lines = "".join(f'<div class="report-month">{_e(getattr(s, f))}</div>'
-                               for f in layout.header_fields if getattr(s, f))
+        header_lines = "".join(f'<div class="report-month">{_e((label + " " + getattr(s, f)).strip())}</div>'
+                               for label, f in layout.header_fields if getattr(s, f))
+        title = f'<div class="report-title">{_e(layout.title)}</div>' if layout.title else ""
         employee = '<div class="employee">שם העובד: ____________________</div>' if layout.employee_line else ""
 
         page = f"""<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>{_e(layout.title)}</title>
+<title>{_e(layout.title or "דוח שעות עבודה")}</title>
 <style>{CSS}</style>
 </head>
 <body>
 <div class="header-container"><div class="header-right">
-<div class="report-title">{_e(layout.title)}</div>
+{title}
 {header_lines}
 </div></div>
 <hr class="divider">
